@@ -100,7 +100,7 @@ def get_namespace(namespace, namespace_path):
 def get_match_locations(match_dict):
     matches = []
     if 'locations' in match_dict.keys():
-        return match_dict['locations']
+        matches += [ x['value'] for x in match_dict['locations'] if x['type']=='absolute']
 
     if match_dict['children']:
         for child in match_dict['children']:
@@ -113,8 +113,15 @@ def parse_json(data):
     capabilities = list(data['rules'].keys())
     for capability in range (0, len(capabilities)):    
         Current_capability = capabilities[capability]
+        print(Current_capability)
         Current_scope = data['rules'][capabilities[capability]]['meta']['scope']
-        Matches_list = list(data['rules'][capabilities[capability]]['matches'].keys())
+        address_match_mapping = {}
+        
+        for match in data['rules'][capabilities[capability]]['matches']:
+            address_info, match_content = match[0], match[1]
+            if address_info['type'] == 'absolute': # if addr_type is no_address, no value field
+                address_match_mapping[address_info['value']] = match_content
+
 
         if 'namespace' in data['rules'][capabilities[capability]]['meta']:
             Current_namespace = data['rules'][capabilities[capability]]['meta']['namespace'].replace("/", "::")
@@ -124,14 +131,16 @@ def parse_json(data):
         meta = data['rules'][capabilities[capability]]['meta']
         if not 'lib' in meta.keys() or meta['lib'] == False:
             addr_list = []
-            for match in data['rules'][capabilities[capability]]['matches'].keys():
-                addr_list += get_match_locations(data['rules'][capabilities[capability]]['matches'][match])
+            for match in address_match_mapping.keys():
+                addr_list += get_match_locations(address_match_mapping[match]) # get locations for all matched rules of the matched capability
+                print(", ".join(map(hex, addr_list)))
+
 
             attack = []
             if "att&ck" in meta.keys():
                 attack = meta['att&ck'] 
-            for match in range (0, len(Matches_list)):
-                item = capa_item(Current_namespace, Current_scope, Current_capability, int(Matches_list[match]), addr_list, attack)
+            for address in address_match_mapping.keys():
+                item = capa_item(Current_namespace, Current_scope, Current_capability, int(address), addr_list, attack)
                 
             capa_items.append(item)
     return capa_items
